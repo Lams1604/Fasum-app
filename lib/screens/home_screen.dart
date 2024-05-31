@@ -7,7 +7,7 @@ import 'add_post_screen.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  Future signOut(BuildContext context) async {
+  Future<void> signOut(BuildContext context) async {
     await FirebaseAuth.instance.signOut();
     Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => SignInScreen()));
@@ -17,75 +17,102 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Beranda'),
+        title: const Text('Beranda'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         actions: [
           IconButton(
-            icon: Icon(Icons.add),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => AddPostScreen()),
-              );
+              signOut(context);
             },
+            icon: const Icon(Icons.logout),
           ),
         ],
       ),
-      body: StreamBuilder(
+      body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('posts').orderBy('timestamp', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return const Center(child: CircularProgressIndicator());
           }
-
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('Tidak ada postingan.'));
+            return const Center(child: Text('Tidak ada postingan tersedia'));
           }
-
-          final posts = snapshot.data!.docs;
-
-          return ListView.builder(
-            itemCount: posts.length,
+          return GridView.builder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3, // Jumlah kolom
+              childAspectRatio: 1, // Rasio aspek untuk membuat gambar kotak
+            ),
+            itemCount: snapshot.data!.docs.length,
             itemBuilder: (context, index) {
-              final post = posts[index];
-              final data = post.data() as Map;
+              var post = snapshot.data!.docs[index];
+              var data = post.data() as Map<String, dynamic>;
+              var postTime = data['timestamp'] as Timestamp;
+              var date = postTime.toDate();
+              var formattedDate = '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute}';
+
+              var username = data.containsKey('username') ? data['username'] : 'Anonim';
+              var imageUrl = data.containsKey('image_url') ? data['image_url'] : null;
+              var text = data.containsKey('text') ? data['text'] : '';
 
               return Card(
-                margin: EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (data['image_url'] != null)
-                        Image.network(
-                          data['image_url'],
-                          height: 200,
-                          width: double.infinity,
+                margin: EdgeInsets.all(4.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (imageUrl != null)
+                      Expanded(
+                        child: Image.network(
+                          imageUrl,
                           fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
                         ),
-                      SizedBox(height: 8.0),
-                      Text(
-                        data['username'] ?? 'Anonim',
-                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
-                      SizedBox(height: 4.0),
-                      Text(data['text'] ?? ''),
-                      SizedBox(height: 8.0),
-                      Text(
-                        data['timestamp'] != null
-                            ? (data['timestamp'] as Timestamp).toDate().toString()
-                            : '',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
+                    Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            username,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            formattedDate,
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 10,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            text,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               );
             },
           );
         },
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => AddPostScreen()),
+          );
+        },
+        child: Icon(Icons.add),
+      ),
     );
   }
 }
-
